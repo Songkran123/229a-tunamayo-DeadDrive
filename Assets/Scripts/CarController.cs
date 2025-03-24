@@ -1,45 +1,75 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody))]
 public class CarController : MonoBehaviour
 {
-    public float acceleration = 5000f;
-    public float maxSpeed = 120f;
-    public float turnSpeed = 50f;
-    public float dragFactor = 0.1f;
+    private float horizontalInput, verticalInput;
+    private float currentSteerAngle, currentbreakForce;
+    private bool isBreaking;
 
-    private Rigidbody rb;
+    // Settings
+    [SerializeField] private float motorForce, breakForce, maxSteerAngle;
 
-    void Start()
-    {
-        rb = GetComponent<Rigidbody>();
-        rb.centerOfMass = new Vector3(0, -0.5f, 0);
-        Debug.Log("Center of Mass: " + rb.centerOfMass);
+    // Wheel Colliders
+    [SerializeField] private WheelCollider frontLeftWheelCollider, frontRightWheelCollider;
+    [SerializeField] private WheelCollider rearLeftWheelCollider, rearRightWheelCollider;
+
+    // Wheels
+    [SerializeField] private Transform frontLeftWheelTransform, frontRightWheelTransform;
+    [SerializeField] private Transform rearLeftWheelTransform, rearRightWheelTransform;
+
+    private void FixedUpdate() {
+        GetInput();
+        HandleMotor();
+        HandleSteering();
+        UpdateWheels();
     }
 
-    void FixedUpdate()
-    {
-        float moveInput = Input.GetAxis("Vertical"); // W = 1, S = -1
-        float turnInput = Input.GetAxis("Horizontal"); // A = -1, D = 1
+    private void GetInput() {
+        // Steering Input
+        horizontalInput = Input.GetAxis("Horizontal");
 
-        // Debug เช็คค่าปุ่ม
-        Debug.Log("Move Input: " + moveInput);
-        Debug.Log("Turn Input: " + turnInput);
-        Vector3 forcePosition = transform.position + transform.TransformPoint(new Vector3(0, -0.5f, -1.5f));
+        // Acceleration Input
+        verticalInput = Input.GetAxis("Vertical");
 
-        // การเร่งเครื่องยนต์ (เพิ่ม ForceMode Impulse)
-        if (Mathf.Abs(moveInput) > 0.1f)
-        {
-            rb.AddForce(transform.forward * moveInput * acceleration, ForceMode.Impulse);
-        }
+        // Breaking Input
+        isBreaking = Input.GetKey(KeyCode.Space);
+    }
 
-        // การเลี้ยวรถ (เพิ่มเงื่อนไขให้หมุนเฉพาะตอนเคลื่อนที่)
-        if (Mathf.Abs(turnInput) > 0.1f && rb.velocity.magnitude > 1f)
-        {
-            rb.AddTorque(Vector3.up * turnInput * turnSpeed, ForceMode.Impulse);
-        }
+    private void HandleMotor() {
+        frontLeftWheelCollider.motorTorque = verticalInput * motorForce;
+        frontRightWheelCollider.motorTorque = verticalInput * motorForce;
+        currentbreakForce = isBreaking ? breakForce : 0f;
+        ApplyBreaking();
+    }
 
-        // ตั้งค่า Drag คงที่
-        rb.drag = 0.1f;
+    private void ApplyBreaking() {
+        frontRightWheelCollider.brakeTorque = currentbreakForce;
+        frontLeftWheelCollider.brakeTorque = currentbreakForce;
+        rearLeftWheelCollider.brakeTorque = currentbreakForce;
+        rearRightWheelCollider.brakeTorque = currentbreakForce;
+    }
+
+    private void HandleSteering() {
+        currentSteerAngle = maxSteerAngle * horizontalInput;
+        frontLeftWheelCollider.steerAngle = currentSteerAngle;
+        frontRightWheelCollider.steerAngle = currentSteerAngle;
+    }
+
+    private void UpdateWheels() {
+        UpdateSingleWheel(frontLeftWheelCollider, frontLeftWheelTransform);
+        UpdateSingleWheel(frontRightWheelCollider, frontRightWheelTransform);
+        UpdateSingleWheel(rearRightWheelCollider, rearRightWheelTransform);
+        UpdateSingleWheel(rearLeftWheelCollider, rearLeftWheelTransform);
+    }
+
+    private void UpdateSingleWheel(WheelCollider wheelCollider, Transform wheelTransform) {
+        Vector3 pos;
+        Quaternion rot; 
+        wheelCollider.GetWorldPose(out pos, out rot);
+        wheelTransform.rotation = rot;
+        wheelTransform.position = pos;
     }
 }
